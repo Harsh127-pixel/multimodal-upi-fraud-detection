@@ -29,3 +29,10 @@ env/
 # IDEs
 .vscode/
 .idea/
+
+# ─────────────────────────────────────────────
+# Dataset folder — excluded due to GitHub storage limits
+# Place your raw audio/training data here locally
+# ─────────────────────────────────────────────
+dataset/*
+!dataset/.gitkeep

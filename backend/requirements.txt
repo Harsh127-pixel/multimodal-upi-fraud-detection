@@ -12,3 +12,5 @@ torch
 transformers
 librosa
 soundfile
+torchaudio
+tqdm

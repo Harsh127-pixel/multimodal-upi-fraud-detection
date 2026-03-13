@@ -18,6 +18,9 @@ With the rise of UPI usage, fraudsters employ sophisticated social engineering t
 
 ```text
 multimodal-upi-fraud-detection/
+├── dataset/                     # Raw training data (gitignored — add locally)
+│   ├── LA.zip                   # ASVspoof2019 Logical Access dataset
+│   └── PA.zip                   # ASVspoof2019 Physical Access dataset
 ├── ml_models/                   # PyTorch Models & Risk Engine
 │   ├── voice_detection/         # Audio analysis models
 │   ├── impersonation_nlp/       # Transformer-based NLP text models
