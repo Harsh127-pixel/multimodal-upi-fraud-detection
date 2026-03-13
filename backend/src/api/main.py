@@ -1,8 +1,9 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 import torch
 import torch.nn as nn
 from typing import List, Optional
+import json
 import uvicorn
 import os
 from dotenv import load_dotenv
@@ -87,8 +88,16 @@ async def analyze_transaction(data: TransactionData):
         "flags": ["Message pattern check" if "urgent" in data.message.lower() else "Standard check"]
     }
 
+from voice_detection.predict import assess_voice_authenticity
+from voice_detection.utils import detect_scam_keywords, build_alert
+
 @app.post("/analyze/voice")
-async def analyze_voice(file: UploadFile = File(...)):
+async def analyze_voice(
+    file: UploadFile = File(...),
+    transaction_id: str = Form("TXN_UNKNOWN"),
+    unusual_transaction: bool = Form(False),
+    new_device: bool = Form(False)
+):
     # 1. Upload to Cloudinary
     try:
         upload_result = cloudinary.uploader.upload(file.file, resource_type="auto", folder="voice_samples")
@@ -96,32 +105,128 @@ async def analyze_voice(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cloudinary upload failed: {str(e)}")
 
-    # 2. Placeholder for audio processing and voice detection logic
-    # (In a real app, you'd process the file_url or the local file here)
-    is_impersonation = False
-    confidence = 0.92
+    # 2. Process audio and detect voice authenticity using our trained model
+    try:
+        # Seek to beginning of file stream (since cloudinary consumed it)
+        await file.seek(0)
+        audio_bytes = await file.read()
+        
+        # Run inference using the prediction pipeline
+        assessment = assess_voice_authenticity(audio_bytes)
+        
+        if not assessment.get("success"):
+            raise HTTPException(status_code=500, detail=assessment.get("error", "Unknown error during audio processing."))
+            
+        real_score = assessment["is_real_probability"]
+        is_impersonation = real_score < 0.50
+        fake_confidence = assessment["is_fake_probability"]
 
-    # 3. Log result to Firebase Firestore
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Voice analysis failed: {str(e)}")
+
+    # 3. Fraud Decision Engine
+    fraud_score = 0
+    
+    if real_score < 0.5:
+        fraud_score += 40
+        
+    if unusual_transaction:
+        fraud_score += 30
+        
+    if new_device:
+        fraud_score += 20
+        
+    fraud_risk = "HIGH" if fraud_score > 60 else "MEDIUM" if fraud_score > 30 else "LOW"
+    final_action = "BLOCK_TRANSACTION" if fraud_score > 60 else "ALLOW"
+
+    # 4. Log Fraud Results to Firebase Firestore
     if db:
         try:
-            doc_ref = db.collection(u'voice_detections').document()
+            doc_ref = db.collection(u'fraud_analysis').document()
             doc_ref.set({
-                u'filename': file.filename,
+                u'transaction_id': transaction_id,
+                u'voice_authenticity_score': round(real_score, 4),
+                u'fraud_risk': fraud_risk,
+                u'action': final_action,
+                u'timestamp': firestore.SERVER_TIMESTAMP,
+                # Additional metadata for debugging 
                 u'file_url': file_url,
-                u'is_impersonation': is_impersonation,
-                u'confidence': confidence,
-                u'timestamp': firestore.SERVER_TIMESTAMP
+                u'fraud_score_raw': fraud_score
             })
         except Exception as e:
             print(f"Firebase logging failed: {str(e)}")
 
+    # 5. Return the integrated fraud assessment
     return {
+        "transaction_id": transaction_id,
         "filename": file.filename,
         "file_url": file_url,
         "is_impersonation": is_impersonation,
-        "confidence": confidence,
-        "message": "Voice analysis completed and logged successfully"
+        "confidence": fake_confidence,
+        "voice_authenticity_score": real_score,
+        "fraud_score": fraud_score,
+        "fraud_risk": fraud_risk,
+        "action": final_action,
+        "message": "Voice analysis and fraud assessment completed successfully"
     }
+
+@app.websocket("/ws/live-scam-detection")
+async def live_scam_detection(websocket: WebSocket):
+    """
+    WebSocket endpoint for real-time scam detection during a live phone call.
+
+    Flow:
+      Client sends JSON per audio chunk:
+        {
+          "audio_b64": "<base64-encoded audio bytes>",
+          "transcript": "share your OTP immediately"
+        }
+
+      Server responds with real-time alert:
+        {
+          "is_scam": true,
+          "alert_messages": ["⚠️ Caller voice appears synthetic", "⚠️ Suspicious phrases heard: otp, immediately"],
+          "voice_authenticity_score": 0.21,
+          "keyword_risk_level": "HIGH",
+          "matched_keywords": ["otp", "immediately"]
+        }
+    """
+    await websocket.accept()
+    print("[WS] Live scam detection session started.")
+
+    try:
+        while True:
+            # 1. Receive the next audio chunk from client
+            raw_data = await websocket.receive_text()
+            payload = json.loads(raw_data)
+
+            audio_b64 = payload.get("audio_b64", "")
+            transcript = payload.get("transcript", "")
+
+            # 2. Voice deepfake detection on the audio chunk
+            voice_score = 0.5  # Default neutral if no audio provided
+            if audio_b64:
+                import base64
+                audio_bytes = base64.b64decode(audio_b64)
+                assessment = assess_voice_authenticity(audio_bytes)
+                if assessment.get("success"):
+                    voice_score = assessment["is_real_probability"]
+
+            # 3. Scam keyword detection on the transcript
+            keyword_result = detect_scam_keywords(transcript)
+
+            # 4. Build the final alert
+            alert = build_alert(voice_score, keyword_result)
+
+            # 5. Send back the real-time alert to the client
+            await websocket.send_text(json.dumps(alert))
+
+    except WebSocketDisconnect:
+        print("[WS] Client disconnected from live scam detection session.")
+    except Exception as e:
+        print(f"[WS] Error during live scam detection: {e}")
+        await websocket.close()
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
