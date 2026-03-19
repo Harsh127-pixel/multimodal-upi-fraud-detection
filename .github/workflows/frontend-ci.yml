@@ -1,0 +1,29 @@
+name: Frontend CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'fraudguard-frontend/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'fraudguard-frontend/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+    - name: Install Dependencies
+      working-directory: ./fraudguard-frontend
+      run: npm install
+    - name: Type Check & Build
+      working-directory: ./fraudguard-frontend
+      run: |
+        npm run build

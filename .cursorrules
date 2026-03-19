@@ -1,0 +1,20 @@
+# Project Rules: Multimodal UPI Fraud Detection (SafeUPI)
+
+## Stack
+- **Frontend**: Quasar 2 (Vite) + TypeScript
+- **Backend**: FastAPI (Python 3.11)
+- **Mobile**: Android (Capacitor) + PWA
+- **State**: Pinia (fraudStore, authStore, settingsStore)
+- **API**: Axios (Base URL: /api -> localhost:8000)
+- **Realtime**: WebSockets (/ws/alerts)
+- **Database**: PostgreSQL (SQLAlchemy Async), Redis (Cache + PubSub)
+- **Background**: Celery
+- **ML**: scikit-learn, XGBoost, HuggingFace Transformers
+
+## Guidelines
+- Follow TypeScript best practices in Quasar.
+- Use Python 3.11 features in FastAPI.
+- **Always write tests for API endpoints.**
+- Use rich aesthetics for the frontend (vibrant colors, glassmorphism, animations).
+- Prioritize visual excellence and premium design.
+- Implement SEO best practices.

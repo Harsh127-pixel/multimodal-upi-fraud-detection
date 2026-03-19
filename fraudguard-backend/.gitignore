@@ -1,0 +1,29 @@
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+alembic/versions/*.pyc
+
+# ML & Uploads
+*.pkl
+*.pt
+*.bin
+*.parquet
+uploads/*
+ml_training/data/*.csv
+
+# Allow keeping tracking files
+!uploads/.gitkeep
+!ml_training/data/.gitkeep
+!app/models/.gitkeep
+!app/models/README.md
+
+# Logs
+logs/
+*.log

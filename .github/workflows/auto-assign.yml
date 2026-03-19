@@ -1,0 +1,16 @@
+name: Auto Assign Reviewers
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+
+jobs:
+  assign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Auto-assign reviewers
+        uses: appleboy/auto-assign-action@v1.1.2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          reviewers: "Harsh127-pixel"

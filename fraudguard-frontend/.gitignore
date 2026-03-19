@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.quasar/
+src-capacitor/android/
+src-capacitor/ios/
+src-cordova/platforms/
+src-cordova/plugins/
+.env
+.env.*
+!.env.example
