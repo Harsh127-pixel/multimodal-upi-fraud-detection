@@ -13,3 +13,4 @@ celery[redis]
 pydantic-settings
 pytest
 httpx
+numpy
