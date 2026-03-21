@@ -5,8 +5,11 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     component: () => import('layouts/MainLayout.vue'),
     children: [
-      { path: '', component: () => import('pages/VerifyUPI.vue') },
-      { path: 'verify', component: () => import('pages/VerifyUPI.vue') }
+      { path: '', component: () => import('pages/DashboardPage.vue') },
+      { path: 'verify', component: () => import('pages/VerifyUPI.vue') },
+      { path: 'report', component: () => import('pages/ReportPage.vue') },
+      { path: 'alerts', component: () => import('pages/AlertsPage.vue') },
+      { path: 'profile', component: () => import('pages/ProfilePage.vue') }
     ],
   },
 

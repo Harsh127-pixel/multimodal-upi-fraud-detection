@@ -8,25 +8,35 @@ export interface Alert {
   timestamp: string;
 }
 
+export interface Transaction {
+  id: string;
+  amount: number;
+  upi_id: string;
+  status: 'scanned' | 'blocked' | 'suspicious';
+  timestamp: string;
+}
+
 export const useFraudStore = defineStore('fraud', {
   state: () => ({
+    safetyScore: 85,
     recentAlerts: [] as Alert[],
-    isMonitoring: false,
+    transactionHistory: [] as Transaction[],
     stats: {
-      totalChecks: 0,
-      threatsDetected: 0,
-    },
+      transactionsToday: 124,
+      fraudsBlocked: 3,
+      communityReports: 12
+    }
   }),
-  getters: {
-    highSeverityAlerts: (state) => state.recentAlerts.filter(a => a.severity === 'high'),
-  },
   actions: {
+    setSafetyScore(score: number) {
+      this.safetyScore = score
+    },
     addAlert(alert: Alert) {
       this.recentAlerts.unshift(alert)
       if (this.recentAlerts.length > 50) this.recentAlerts.pop()
     },
-    toggleMonitoring(status?: boolean) {
-      this.isMonitoring = status ?? !this.isMonitoring
-    },
-  },
+    addTransaction(transaction: Transaction) {
+      this.transactionHistory.unshift(transaction)
+    }
+  }
 })
