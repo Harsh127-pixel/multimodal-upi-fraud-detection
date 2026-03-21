@@ -1,0 +1,20 @@
+{
+    "upi_age_days": 0.294936532992992,
+    "registration_state_risk": 1.7025400746812528e-06,
+    "tx_velocity_1hr": 0.16621006713918257,
+    "tx_velocity_24hr": 0.008585287037874074,
+    "tx_velocity_7d": 0.0006696949033316573,
+    "amount": 9.158630379052305e-05,
+    "amount_deviation": 0.08264368462548131,
+    "time_of_day_risk": 6.545136051881638e-07,
+    "is_weekend": 0.0003281607731263537,
+    "is_post_call": 0.005685174477719611,
+    "payee_payer_graph_distance": 0.024879139552224042,
+    "payer_account_age_days": 0.0750509333287274,
+    "device_match": 0.05635350294750981,
+    "is_new_payee": 0.03617744305476656,
+    "payee_blacklist_score": 0.23842754045055284,
+    "amount_round_number": 0.009958501189227722,
+    "is_high_value": 1.5379183713609678e-07,
+    "hour_of_day": 2.403779764245915e-07
+}
