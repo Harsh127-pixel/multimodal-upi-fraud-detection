@@ -16,6 +16,13 @@ class FeatureExtractor:
         18: 0.2, 19: 0.3, 20: 0.4, 21: 0.5, 22: 0.6, 23: 0.8
     }
 
+    def __init__(self, redis_client=None):
+        self.redis = redis_client
+
+    def extract(self, tx: dict) -> np.ndarray:
+        """Alias for extract_features with user-requested name."""
+        return self.extract_features(tx)
+
     def extract_features(self, tx: dict) -> np.ndarray:
         """
         Extracts 18 features from the transaction dictionary.
@@ -29,6 +36,8 @@ class FeatureExtractor:
         registration_state_risk = float(tx.get('registration_state_risk', 0.0))
         
         # 3. tx_velocity_1hr
+        # In a real system, these would be fetched from Redis if redis_client is present.
+        # For now, we use the values passed in 'tx' or 0.0 as fallback.
         tx_velocity_1hr = float(tx.get('tx_velocity_1hr', 0))
         
         # 4. tx_velocity_24hr
@@ -48,8 +57,14 @@ class FeatureExtractor:
         # Get time-based info
         ts = tx.get('timestamp')
         if not isinstance(ts, datetime):
-            # Fallback to current time if missing or wrong type
-            ts = datetime.now()
+            if isinstance(ts, str):
+                try:
+                    ts = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                except ValueError:
+                    ts = datetime.utcnow()
+            else:
+                # Fallback to current time if missing or wrong type
+                ts = datetime.utcnow()
             
         hour = ts.hour
         is_weekend = 1 if ts.weekday() >= 5 else 0

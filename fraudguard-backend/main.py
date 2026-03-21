@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.upi import router as upi_router
+from app.api.transactions import router as transactions_router
 
 app = FastAPI(title="FraudGuard Backend")
 
@@ -19,6 +20,7 @@ app.add_middleware(
 )
 
 app.include_router(upi_router, prefix="/api/upi", tags=["upi"])
+app.include_router(transactions_router, prefix="/api/transactions", tags=["transactions"])
 
 @app.get("/health")
 async def health_check():

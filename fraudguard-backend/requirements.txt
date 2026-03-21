@@ -1,7 +1,7 @@
 # Backend Requirements for FraudGuard
 fastapi
 uvicorn[standard]
-sqlalchemy
+sqlalchemy>=2.0.0
 alembic>=1.13.0
 asyncpg>=0.29.0
 psycopg2-binary>=2.9.9
