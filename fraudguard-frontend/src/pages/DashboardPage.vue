@@ -98,10 +98,35 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
+import { useQuasar } from 'quasar'
 import { useFraudStore } from 'src/stores/fraudStore'
 
+const $q = useQuasar()
 const fraudStore = useFraudStore()
+
+// Watch for incoming real-time alerts
+watch(() => fraudStore.recentAlerts[0], (newAlert) => {
+  if (!newAlert) return
+  
+  if (newAlert.action === 'block') {
+    $q.notify({
+      color: 'negative',
+      message: `Transaction BLOCKED: ${newAlert.upi_id} (Score: ${newAlert.score})`,
+      icon: 'block',
+      timeout: 8000,
+      position: 'top'
+    })
+  } else if (newAlert.action === 'warn') {
+    $q.notify({
+      color: 'warning',
+      message: `Suspicious Transaction: ${newAlert.upi_id} (Score: ${newAlert.score})`,
+      icon: 'priority_high',
+      timeout: 5000,
+      position: 'top'
+    })
+  }
+}, { deep: true })
 
 const limitedAlerts = computed(() => fraudStore.recentAlerts.slice(0, 5))
 

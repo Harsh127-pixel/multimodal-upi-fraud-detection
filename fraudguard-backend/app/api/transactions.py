@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from datetime import datetime, timezone
 import time
+import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -87,13 +88,38 @@ async def score_transaction(request: TransactionRequest, db: AsyncSession = Depe
         amount=request.amount,
         score=score,
         is_fraud=(score >= 75),
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
         device_id=request.device_id,
         post_call_flag=request.is_post_call
     )
     
     db.add(new_tx)
     await db.commit()
+    
+    # Pipeline: Publish Real-time Alerts
+    if score >= 40:
+        import redis.asyncio as redis
+        import json
+        
+        REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+        try:
+            r = redis.from_url(REDIS_URL, decode_responses=True)
+            alert_data = {
+                "type": "fraud_alert",
+                "upi_id": request.upi_id,
+                "score": score,
+                "action": action,
+                "risk_signals": risk_signals,
+                "timestamp": datetime.now(timezone.utc).isoformat()
+            }
+            # Use payer_upi_id as the user identifier as requested
+            channel = f"alerts:{request.payer_upi_id}"
+            await r.publish(channel, json.dumps(alert_data))
+            await r.close()
+        except Exception as e:
+            # Skip silently and log a warning as requested
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to publish alert to Redis: {str(e)}")
     
     elapsed_ms = int((time.time() - start_time) * 1000)
     
