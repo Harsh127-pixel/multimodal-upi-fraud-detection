@@ -58,6 +58,15 @@
           </q-item-section>
         </q-item>
 
+        <q-item clickable v-ripple exact to="/advanced">
+          <q-item-section avatar>
+            <q-icon name="analytics" />
+          </q-item-section>
+          <q-item-section>
+            <q-item-label>Advanced Analysis</q-item-label>
+          </q-item-section>
+        </q-item>
+
         <q-separator spaced />
 
         <q-item clickable v-ripple exact to="/settings">
@@ -96,6 +105,12 @@
           to="/verify"
           icon="verified_user"
           label="Verify"
+        />
+        <q-route-tab
+          name="advanced"
+          to="/advanced"
+          icon="analytics"
+          label="Advanced"
         />
         <q-route-tab
           name="report"

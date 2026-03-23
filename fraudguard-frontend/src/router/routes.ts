@@ -9,7 +9,8 @@ const routes: RouteRecordRaw[] = [
       { path: 'verify', component: () => import('pages/VerifyUPI.vue') },
       { path: 'report', component: () => import('pages/ReportPage.vue') },
       { path: 'alerts', component: () => import('pages/AlertsPage.vue') },
-      { path: 'profile', component: () => import('pages/ProfilePage.vue') }
+      { path: 'profile', component: () => import('pages/ProfilePage.vue') },
+      { path: 'advanced', component: () => import('pages/AdvancedAnalysis.vue') }
     ],
   },
 

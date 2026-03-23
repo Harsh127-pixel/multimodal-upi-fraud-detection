@@ -1,11 +1,15 @@
 import { defineStore } from 'pinia'
 
 export interface Alert {
-  id: string;
+  id?: string;
   type: string;
-  message: string;
-  severity: 'low' | 'medium' | 'high';
+  message?: string;
+  severity?: 'low' | 'medium' | 'high';
   timestamp: string;
+  upi_id?: string;
+  score?: number;
+  action?: 'allow' | 'warn' | 'block';
+  risk_signals?: string[];
 }
 
 export interface Transaction {
