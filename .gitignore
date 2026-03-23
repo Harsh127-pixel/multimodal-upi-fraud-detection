@@ -27,3 +27,6 @@ checkpoint-*/
 node_modules/
 dist/
 .quasar/
+
+# Uploads
+uploads/
