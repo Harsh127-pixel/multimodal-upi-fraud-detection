@@ -69,7 +69,7 @@
 
           <q-card-section>
             <q-list separator>
-              <q-item v-for="alert in limitedAlerts" :key="alert.id" class="q-py-md px-none">
+              <q-item v-for="alert in limitedAlerts" :key="alert.id || alert.timestamp" class="q-py-md px-none">
                 <q-item-section avatar>
                   <q-icon 
                     :name="alert.severity === 'high' ? 'error' : (alert.severity === 'medium' ? 'warning' : 'info')" 

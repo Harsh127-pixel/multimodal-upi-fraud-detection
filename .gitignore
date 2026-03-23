@@ -11,3 +11,19 @@ desktop.ini
 *.njsproj
 *.sln
 *.sw?
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Models
+models/
+checkpoint-*/
+
+# Frontend
+node_modules/
+dist/
+.quasar/

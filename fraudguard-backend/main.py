@@ -4,6 +4,8 @@ from app.api.upi import router as upi_router
 from app.api.transactions import router as transactions_router
 from app.api.alerts import router as alerts_router
 from app.api.sms import router as sms_router
+from app.api.calls import router as calls_router
+from app.api.multimodal import router as multi_router
 
 app = FastAPI(title="FraudGuard Backend")
 

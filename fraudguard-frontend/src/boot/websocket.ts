@@ -50,7 +50,7 @@ export const disconnect = () => {
   }
 };
 
-export default boot(async () => {
+export default boot(() => {
   // Use email as ID for now matching the verification curl
   const userId = 'me@upi';
   connect(userId);

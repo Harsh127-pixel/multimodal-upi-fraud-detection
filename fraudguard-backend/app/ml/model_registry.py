@@ -11,9 +11,10 @@ class ModelRegistry:
         self._models = {}
         self._m1_lock = threading.Lock()
         self._m3_lock = threading.Lock()
+        self._m4_lock = threading.Lock()
 
     def get_m1_scorer(self) -> Any:
-        # ... (rest of get_m1_scorer remains the same) ...
+        # returns M1 VotingClassifier...
         if "m1_scorer" not in self._models:
             with self._m1_lock:
                 if "m1_scorer" not in self._models:
@@ -36,6 +37,15 @@ class ModelRegistry:
                     from app.ml.sms_classifier import SMSClassifier
                     self._models["m3_sms"] = SMSClassifier()
         return self._models["m3_sms"]
+
+    def get_m4_classifier(self) -> Any:
+        """Loads and returns the M4 Call intent classifier (CallIntentClassifier)."""
+        if "m4_call" not in self._models:
+            with self._m4_lock:
+                if "m4_call" not in self._models:
+                    from app.ml.call_intent import CallIntentClassifier
+                    self._models["m4_call"] = CallIntentClassifier()
+        return self._models["m4_call"]
 
 # Singleton instance
 registry = ModelRegistry()
