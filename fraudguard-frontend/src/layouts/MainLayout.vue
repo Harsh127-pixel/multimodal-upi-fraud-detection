@@ -113,6 +113,12 @@
           label="Advanced"
         />
         <q-route-tab
+          name="analytics"
+          to="/analytics"
+          icon="bar_chart"
+          label="Analytics"
+        />
+        <q-route-tab
           name="report"
           to="/report"
           icon="report_problem"

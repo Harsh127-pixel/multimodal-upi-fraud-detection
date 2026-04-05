@@ -7,6 +7,9 @@ from app.api.sms import router as sms_router
 from app.api.calls import router as calls_router
 from app.api.multimodal import router as multi_router
 from app.api.audio import router as audio_router
+from app.api.reports import router as reports_router
+from app.api.analytics import router as analytics_router
+from app.api.auth import router as auth_router
 
 app = FastAPI(title="FraudGuard Backend")
 
@@ -31,6 +34,9 @@ app.include_router(sms_router, prefix="/api/sms", tags=["sms"])
 app.include_router(calls_router, prefix="/api/calls", tags=["calls"])
 app.include_router(multi_router, prefix="/api/multi", tags=["multi"])
 app.include_router(audio_router, prefix="/api/audio", tags=["audio"])
+app.include_router(reports_router, prefix="/api/reports", tags=["reports"])
+app.include_router(analytics_router, prefix="/api/analytics", tags=["analytics"])
+app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 
 @app.get("/health")
 async def health_check():
