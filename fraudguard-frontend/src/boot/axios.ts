@@ -1,6 +1,7 @@
 import { boot } from 'quasar/wrappers'
 import { type App } from 'vue'
 import axios, { type AxiosInstance } from 'axios'
+import { useAuthStore } from 'src/stores/authStore'
 
 declare module 'vue' {
   interface ComponentCustomProperties {
@@ -12,16 +13,22 @@ declare module 'vue' {
 // Be careful when using SSR for global axios instances
 const api = axios.create({ baseURL: '/api' })
 
+// Add Request Interceptor for JWT
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('auth_token');
+  if (token && config.url?.startsWith('/')) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export default boot(({ app }: { app: App }) => {
-  // for use inside Vue files (Options API) through this.$axios and this.$api
+  // Rehydrate auth store on startup to recover session
+  const authStore = useAuthStore()
+  authStore.rehydrate()
 
   app.config.globalProperties.$axios = axios
-  // ^ ^ ^ this will allow you to use this.$axios (for Vue Options API form)
-  //       so you won't necessarily have to import axios in each vue file
-
   app.config.globalProperties.$api = api
-  // ^ ^ ^ this will allow you to use this.$api (for Vue Options API form)
-  //       so you can easily perform requests against your app's API
 })
 
 export { api }

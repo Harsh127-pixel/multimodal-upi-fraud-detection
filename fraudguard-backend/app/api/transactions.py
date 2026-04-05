@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.core.database import get_db
+from app.api.deps import get_current_user
 from app.models.transaction import Transaction
 from app.ml.feature_eng import FeatureExtractor
 from app.ml.model_registry import registry
@@ -130,3 +131,28 @@ async def score_transaction(request: TransactionRequest, db: AsyncSession = Depe
         "upi_id": request.upi_id,
         "processing_time_ms": elapsed_ms
     }
+
+@router.get("/history")
+async def get_transaction_history(
+    db: AsyncSession = Depends(get_db), 
+    current_user=Depends(get_current_user)
+):
+    from sqlalchemy import select, desc
+    stmt = select(Transaction).order_by(desc(Transaction.timestamp)).limit(100)
+    result = await db.execute(stmt)
+    transactions = result.scalars().all()
+    
+    response = []
+    for tx in transactions:
+        action = "block" if tx.score >= 75 else "warn" if tx.score >= 40 else "allow"
+        response.append({
+            "id": str(tx.id),
+            "upi_id": tx.upi_id,
+            "amount": tx.amount,
+            "score": tx.score,
+            "is_fraud": tx.is_fraud,
+            "timestamp": tx.timestamp.isoformat(),
+            "post_call_flag": tx.post_call_flag,
+            "action": action
+        })
+    return response
