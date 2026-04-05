@@ -24,7 +24,7 @@
             <q-separator />
 
             <q-tab-panels v-model="tab" animated>
-              <q-tab_panel name="transaction">
+              <q-tab-panel name="transaction">
                 <div class="row q-col-gutter-sm">
                   <div class="col-12 col-sm-6">
                     <q-input v-model="form.upi_id" label="Payee UPI ID" outlined dense />
@@ -36,9 +36,9 @@
                     <q-checkbox v-model="form.is_post_call" label="Transaction initiated after a call?" color="primary" />
                   </div>
                 </div>
-              </q-tab_panel>
+              </q-tab-panel>
 
-              <q-tab_panel name="sms">
+              <q-tab-panel name="sms">
                 <q-input
                   v-model="form.sms_text"
                   type="textarea"
@@ -46,9 +46,9 @@
                   outlined
                   rows="5"
                 />
-              </q-tab_panel>
+              </q-tab-panel>
 
-              <q-tab_panel name="voice">
+              <q-tab-panel name="voice">
                 <q-input
                   v-model="form.call_transcript"
                   type="textarea"
@@ -56,7 +56,7 @@
                   outlined
                   rows="5"
                 />
-              </q-tab_panel>
+              </q-tab-panel>
             </q-tab-panels>
 
             <q-card-actions align="right" class="q-pa-md">
@@ -131,10 +131,17 @@
 import { ref, reactive, computed } from 'vue'
 import { useQuasar } from 'quasar'
 
+interface AnalysisResult {
+  global_score: number;
+  risk_level: string;
+  recommendation: string;
+  modalities_analyzed: string[];
+}
+
 const $q = useQuasar()
 const tab = ref('transaction')
 const loading = ref(false)
-const result = ref<any>(null)
+const result = ref<AnalysisResult | null>(null)
 
 const form = reactive({
   upi_id: '',
@@ -152,9 +159,9 @@ const form = reactive({
 })
 
 const scoreColorClass = computed(() => {
-  if (!result.value) return ''
-  if (result.value.global_score > 75) return 'text-red'
-  if (result.value.global_score > 40) return 'text-orange-9'
+  const score = result.value?.global_score ?? 0
+  if (score > 75) return 'text-red'
+  if (score > 40) return 'text-orange-9'
   return 'text-green'
 })
 
@@ -189,14 +196,14 @@ const runAnalysis = async () => {
     if (response.ok) {
       result.value = await response.json()
       $q.notify({
-        color: result.value.global_score > 40 ? 'negative' : 'positive',
+        color: (result.value?.global_score ?? 0) > 40 ? 'negative' : 'positive',
         message: 'Analysis Complete',
         icon: 'done_all'
       })
     } else {
       throw new Error('Analysis failed')
     }
-  } catch (err) {
+  } catch {
     $q.notify({
       color: 'negative',
       message: 'Failed to run multimodal analysis. Ensure models are trained.',

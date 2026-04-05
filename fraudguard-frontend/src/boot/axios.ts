@@ -10,8 +10,8 @@ declare module 'vue' {
   }
 }
 
-// Be careful when using SSR for global axios instances
-const api = axios.create({ baseURL: '/api' })
+// Direct backend URL bypassing the devServer proxy for reliability
+const api = axios.create({ baseURL: 'http://127.0.0.1:8000/api' })
 
 // Add Request Interceptor for JWT
 api.interceptors.request.use((config) => {

@@ -142,18 +142,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useFraudStore } from 'src/stores/fraudStore'
+import { useAuthStore } from 'src/stores/authStore'
+import { connectWebSocket, disconnect } from 'src/boot/websocket'
 
 const leftDrawerOpen = ref(false);
 const currentTab = ref('dashboard');
 const fraudStore = useFraudStore()
+const authStore = useAuthStore()
 
 const hasAlerts = computed(() => fraudStore.recentAlerts.length > 0)
 
 function toggleLeftDrawer () {
   leftDrawerOpen.value = !leftDrawerOpen.value;
 }
+
+const handleWS = () => {
+  if (authStore.isAuthenticated && authStore.userEmail) {
+    connectWebSocket(authStore.userEmail)
+  } else {
+    disconnect()
+  }
+}
+
+onMounted(() => {
+  handleWS()
+})
+
+onUnmounted(() => {
+  disconnect()
+})
+
+watch(() => authStore.isAuthenticated, () => {
+  handleWS()
+})
 </script>
 
 <style scoped>

@@ -11,6 +11,7 @@ REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
 
 @router.websocket("/ws/alerts/{user_id}")
 async def websocket_alerts(websocket: WebSocket, user_id: str):
+    logger.info(f"Incoming WS connection attempt for user: {user_id}")
     await websocket.accept()
     
     # Establish Redis connection for this websocket
