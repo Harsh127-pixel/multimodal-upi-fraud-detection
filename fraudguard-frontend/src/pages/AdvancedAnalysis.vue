@@ -24,7 +24,7 @@
             <q-separator />
 
             <q-tab-panels v-model="tab" animated>
-              <q-tab_panel name="transaction">
+              <q-tab-panel name="transaction">
                 <div class="row q-col-gutter-sm">
                   <div class="col-12 col-sm-6">
                     <q-input v-model="form.upi_id" label="Payee UPI ID" outlined dense />
@@ -36,9 +36,9 @@
                     <q-checkbox v-model="form.is_post_call" label="Transaction initiated after a call?" color="primary" />
                   </div>
                 </div>
-              </q-tab_panel>
+              </q-tab-panel>
 
-              <q-tab_panel name="sms">
+              <q-tab-panel name="sms">
                 <q-input
                   v-model="form.sms_text"
                   type="textarea"
@@ -46,17 +46,53 @@
                   outlined
                   rows="5"
                 />
-              </q-tab_panel>
+              </q-tab-panel>
 
-              <q-tab_panel name="voice">
-                <q-input
-                  v-model="form.call_transcript"
-                  type="textarea"
-                  label="Paste voice transcript here..."
-                  outlined
-                  rows="5"
-                />
-              </q-tab_panel>
+              <q-tab-panel name="voice">
+                <div class="q-gutter-y-md">
+                  <div class="row q-col-gutter-md items-center">
+                    <div class="col-12 col-sm-6">
+                      <q-file
+                        v-model="audioFile"
+                        label="Upload Audio (.mp3, .wav)"
+                        outlined
+                        dense
+                        accept=".mp3,.wav,audio/*"
+                      >
+                        <template v-slot:prepend>
+                          <q-icon name="attach_file" />
+                        </template>
+                        <template v-slot:after v-if="audioFile">
+                          <q-btn round dense flat icon="send" color="primary" @click="uploadAudio" :loading="transcriptionLoading" />
+                        </template>
+                      </q-file>
+                    </div>
+                    <div class="col-12 col-sm-6 text-center">
+                      <q-btn
+                        :color="isRecording ? 'red' : 'primary'"
+                        :icon="isRecording ? 'stop' : 'mic'"
+                        :label="isRecording ? 'Stop Recording' : 'Record Memo'"
+                        @click="isRecording ? stopRecording() : startRecording()"
+                        unelevated
+                        :loading="transcriptionLoading && isRecording"
+                      />
+                      <div v-if="isRecording" class="text-caption text-red q-mt-xs anim-pulse">recording...</div>
+                    </div>
+                  </div>
+
+                  <q-separator />
+
+                  <div class="text-subtitle2 text-grey-7 q-mb-xs">Transcript</div>
+                  <q-input
+                    v-model="form.call_transcript"
+                    type="textarea"
+                    label="AI Transcription will appear here..."
+                    outlined
+                    rows="4"
+                    :loading="transcriptionLoading"
+                  />
+                </div>
+              </q-tab-panel>
             </q-tab-panels>
 
             <q-card-actions align="right" class="q-pa-md">
@@ -130,11 +166,26 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
 import { useQuasar } from 'quasar'
+import { api } from 'boot/axios'
+
+interface AnalysisResult {
+  global_score: number;
+  risk_level: string;
+  recommendation: string;
+  modalities_analyzed: string[];
+}
 
 const $q = useQuasar()
 const tab = ref('transaction')
 const loading = ref(false)
-const result = ref<any>(null)
+const result = ref<AnalysisResult | null>(null)
+
+// Audio Recording State
+const audioFile = ref<File | null>(null)
+const isRecording = ref(false)
+const transcriptionLoading = ref(false)
+let mediaRecorder: MediaRecorder | null = null
+let audioChunks: Blob[] = []
 
 const form = reactive({
   upi_id: '',
@@ -152,11 +203,87 @@ const form = reactive({
 })
 
 const scoreColorClass = computed(() => {
-  if (!result.value) return ''
-  if (result.value.global_score > 75) return 'text-red'
-  if (result.value.global_score > 40) return 'text-orange-9'
+  const score = result.value?.global_score ?? 0
+  if (score > 75) return 'text-red'
+  if (score > 40) return 'text-orange-9'
   return 'text-green'
 })
+
+// Voice Recording Logic
+const startRecording = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    mediaRecorder = new MediaRecorder(stream)
+    audioChunks = []
+    
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunks.push(event.data)
+    }
+    
+    mediaRecorder.onstop = () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' })
+      const file = new File([audioBlob], 'memo.wav', { type: 'audio/wav' })
+      audioFile.value = file
+      void processAudio(file)
+    }
+    
+    mediaRecorder.start()
+    isRecording.value = true
+  } catch {
+    $q.notify({ color: 'negative', message: 'Microphone access denied' })
+  }
+}
+
+const stopRecording = () => {
+  if (mediaRecorder) {
+    mediaRecorder.stop()
+    isRecording.value = false
+  }
+}
+
+const uploadAudio = () => {
+  if (audioFile.value) {
+    void processAudio(audioFile.value)
+  }
+}
+
+const processAudio = async (file: File) => {
+  transcriptionLoading.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const response = await api.post('/audio/analyze', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    
+    pollTranscriptionResult(response.data.task_id)
+  } catch {
+    $q.notify({ color: 'negative', message: 'Failed to upload audio' })
+    transcriptionLoading.value = false
+  }
+}
+
+const pollTranscriptionResult = (taskId: string) => {
+  const poll = async () => {
+    try {
+      const response = await api.get(`/audio/result/${taskId}`)
+      if (response.data.status === 'complete') {
+        form.call_transcript = response.data.transcription
+        transcriptionLoading.value = false
+        $q.notify({ color: 'positive', message: 'Transcription complete', icon: 'mic' })
+      } else if (response.data.status === 'failed') {
+        throw new Error('Transcription failed')
+      } else {
+        setTimeout(() => { void poll() }, 2000)
+      }
+    } catch {
+      $q.notify({ color: 'negative', message: 'Transcription failed' })
+      transcriptionLoading.value = false
+    }
+  }
+  void poll()
+}
 
 const runAnalysis = async () => {
   loading.value = true
@@ -180,26 +307,18 @@ const runAnalysis = async () => {
       call_transcript: form.call_transcript || null
     }
 
-    const response = await fetch('/api/multi/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+    const response = await api.post('/multi/verify', payload)
+    result.value = response.data
+    
+    $q.notify({
+      color: (result.value?.global_score ?? 0) > 40 ? 'negative' : 'positive',
+      message: 'Analysis Complete',
+      icon: 'done_all'
     })
-
-    if (response.ok) {
-      result.value = await response.json()
-      $q.notify({
-        color: result.value.global_score > 40 ? 'negative' : 'positive',
-        message: 'Analysis Complete',
-        icon: 'done_all'
-      })
-    } else {
-      throw new Error('Analysis failed')
-    }
-  } catch (err) {
+  } catch {
     $q.notify({
       color: 'negative',
-      message: 'Failed to run multimodal analysis. Ensure models are trained.',
+      message: 'Failed to run multimodal analysis. Ensure models and workers are running.',
       icon: 'error'
     })
   } finally {
@@ -214,5 +333,13 @@ const runAnalysis = async () => {
 }
 .border-dashed {
   border: 2px dashed #e0e0e0;
+}
+.anim-pulse {
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
 }
 </style>

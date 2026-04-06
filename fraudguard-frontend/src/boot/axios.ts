@@ -10,7 +10,7 @@ declare module 'vue' {
   }
 }
 
-// Be careful when using SSR for global axios instances
+// Standard relative path for devServer proxy compatibility
 const api = axios.create({ baseURL: '/api' })
 
 // Add Request Interceptor for JWT

@@ -5,15 +5,17 @@ let socket: WebSocket | null = null;
 let reconnectAttempts = 0;
 const maxReconnectAttempts = 5;
 
-const connect = (userId: string) => {
+export const connectWebSocket = (userId: string) => {
   if (reconnectAttempts >= maxReconnectAttempts) {
     console.error('WebSocket: Max reconnect attempts reached');
     return;
   }
 
+  // Disconnect existing if any
+  disconnect();
+
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  // Standardizing on localhost:8000 for development as requested
-  const wsUrl = `${protocol}//localhost:8000/ws/alerts/${encodeURIComponent(userId)}`;
+  const wsUrl = `${protocol}//127.0.0.1:8000/ws/alerts/${encodeURIComponent(userId)}`;
   
   socket = new WebSocket(wsUrl);
 
@@ -33,9 +35,11 @@ const connect = (userId: string) => {
   };
 
   socket.onclose = () => {
-    console.warn('WebSocket: Disconnected');
-    reconnectAttempts++;
-    setTimeout(() => connect(userId), 3000);
+    if (socket) {
+      console.warn('WebSocket: Disconnected, retrying...');
+      reconnectAttempts++;
+      setTimeout(() => connectWebSocket(userId), 3000);
+    }
   };
 
   socket.onerror = (error) => {
@@ -45,13 +49,13 @@ const connect = (userId: string) => {
 
 export const disconnect = () => {
   if (socket) {
-    socket.close();
-    socket = null;
+    const s = socket;
+    socket = null; // Set to null before closing to prevent onclose retry
+    s.close();
   }
 };
 
 export default boot(() => {
-  // Use email as ID for now matching the verification curl
-  const userId = 'me@upi';
-  connect(userId);
+  // We no longer connect automatically on boot.
+  // Connection is handled by MainLayout when user is authenticated.
 });

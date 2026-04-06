@@ -76,14 +76,17 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { api } from 'boot/axios'
 
-const upiId = ref('')
-const loading = ref(false)
-const result = ref<{
+interface VerifyResult {
   risk_score: number;
   risk_level: string;
   risk_signals: string[];
-} | null>(null)
+}
+
+const upiId = ref('')
+const loading = ref(false)
+const result = ref<VerifyResult | null>(null)
 
 const scoreColor = computed(() => {
   if (!result.value) return 'grey'
@@ -105,21 +108,12 @@ const verifyUpi = async () => {
   result.value = null
   
   try {
-    const response = await fetch('http://localhost:8000/api/upi/verify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ upi_id: upiId.value.trim() })
+    const response = await api.post('/upi/verify', { 
+      upi_id: upiId.value.trim() 
     })
-    
-    if (response.ok) {
-      result.value = await response.json()
-    } else {
-      console.error('Failed to verify UPI')
-    }
-  } catch (error) {
-    console.error('Error:', error)
+    result.value = response.data
+  } catch (err: unknown) {
+    console.error('Failed to verify UPI:', err)
   } finally {
     loading.value = false
   }

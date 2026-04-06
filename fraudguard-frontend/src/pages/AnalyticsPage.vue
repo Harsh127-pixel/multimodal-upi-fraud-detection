@@ -136,13 +136,39 @@ import { ref, onMounted, computed } from 'vue'
 import { api } from 'boot/axios'
 import VueApexCharts from 'vue3-apexcharts'
 
+interface AnalyticsSummary {
+  total_transactions: number;
+  total_frauds_blocked: number;
+  total_amount_protected: number;
+  community_reports: number;
+  fraud_by_type: {
+    fake_qr: number;
+    impersonation: number;
+    lottery: number;
+    investment: number;
+    other: number;
+  };
+  daily_fraud_attempts: Array<{ date: string; count: number }>;
+}
+
+interface TransactionRecord {
+  id: string;
+  upi_id: string;
+  amount: number;
+  score: number;
+  is_fraud: boolean;
+  timestamp: string;
+  post_call_flag: boolean;
+  action: string;
+}
+
 const apexchart = VueApexCharts
 
 const loading = ref(true)
 const error = ref<string | null>(null)
 const activeFilter = ref('all')
-const summary = ref<any>(null)
-const history = ref<any[]>([])
+const summary = ref<AnalyticsSummary | null>(null)
+const history = ref<TransactionRecord[]>([])
 
 onMounted(async () => {
   await fetchData()
@@ -188,10 +214,10 @@ const donutSeries = computed(() => {
   ]
 })
 
-const donutOptions: any = {
+const donutOptions = {
   labels: ["Fake QR", "Impersonation", "Lottery", "Investment", "Other"],
   colors: ["#E24B4A", "#BA7517", "#534AB7", "#0F6E56", "#888780"],
-  legend: { position: 'bottom' },
+  legend: { position: 'bottom' as const },
   chart: { toolbar: { show: false } }
 }
 
@@ -199,20 +225,20 @@ const areaSeries = computed(() => {
   if (!summary.value) return []
   return [{
     name: 'Attempts',
-    data: summary.value.daily_fraud_attempts.map((d: any) => d.count)
+    data: summary.value.daily_fraud_attempts.map(d => d.count)
   }]
 })
 
-const areaOptions = computed<any>(() => {
+const areaOptions = computed(() => {
   if (!summary.value) return {}
   return {
     chart: { toolbar: { show: false } },
     colors: ["#E24B4A"],
-    stroke: { curve: 'smooth' },
+    stroke: { curve: 'smooth' as const },
     fill: { opacity: 0.3 },
     xaxis: {
-      type: 'datetime',
-      categories: summary.value.daily_fraud_attempts.map((d: any) => d.date)
+      type: 'datetime' as const,
+      categories: summary.value.daily_fraud_attempts.map(d => d.date)
     },
     yaxis: {
       min: 0
@@ -220,13 +246,13 @@ const areaOptions = computed<any>(() => {
   }
 })
 
-const columns: any[] = [
-  { name: 'timestamp', label: 'Time', field: 'timestamp', align: 'left', sortable: true },
-  { name: 'upi_id', label: 'UPI ID', field: 'upi_id', align: 'left', sortable: true },
-  { name: 'amount', label: 'Amount', field: 'amount', align: 'right', sortable: true },
-  { name: 'score', label: 'Score', field: 'score', align: 'center', sortable: true },
-  { name: 'action', label: 'Action', field: 'action', align: 'center', sortable: true },
-  { name: 'post_call_flag', label: 'Post-Call', field: 'post_call_flag', align: 'center' }
+const columns = [
+  { name: 'timestamp', label: 'Time', field: 'timestamp', align: 'left' as const, sortable: true },
+  { name: 'upi_id', label: 'UPI ID', field: 'upi_id', align: 'left' as const, sortable: true },
+  { name: 'amount', label: 'Amount', field: 'amount', align: 'right' as const, sortable: true },
+  { name: 'score', label: 'Score', field: 'score', align: 'center' as const, sortable: true },
+  { name: 'action', label: 'Action', field: 'action', align: 'center' as const, sortable: true },
+  { name: 'post_call_flag', label: 'Post-Call', field: 'post_call_flag', align: 'center' as const }
 ]
 
 const filteredTransactions = computed(() => {

@@ -50,6 +50,7 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from 'src/stores/authStore'
 import { useQuasar } from 'quasar'
+import axios from 'axios'
 
 const $q = useQuasar()
 const router = useRouter()
@@ -87,11 +88,14 @@ async function handleSubmit() {
         message: 'Logged in successfully!', 
         position: 'top' 
       })
-      router.push('/')
+      await router.push('/')
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Auth error:', err)
-    const detail = err.response?.data?.detail || 'Operation failed. Check your credentials.'
+    let detail = 'Operation failed. Check your credentials.'
+    if (axios.isAxiosError(err) && err.response?.data?.detail) {
+      detail = err.response.data.detail as string
+    }
     $q.notify({ 
       type: 'negative', 
       message: detail, 

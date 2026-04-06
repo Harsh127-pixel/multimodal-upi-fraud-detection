@@ -34,27 +34,38 @@ class SMSClassifier:
             self.model.eval()
 
     def classify(self, text: str) -> dict:
-        self._load_model()
-        
-        # 1. BERT classification
-        inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=128, padding=True).to(self.device)
-        with torch.no_grad():
-            outputs = self.model(**inputs)
-            probs = torch.softmax(outputs.logits, dim=-1)
-            confidence, prediction = torch.max(probs, dim=-1)
-            
-        is_fraud = bool(prediction.item() == 1)
-        
-        # 2. Pattern matching
         matched_patterns = []
         text_lower = text.lower()
         for label, keywords in self.patterns.items():
             if any(kw.lower() in text_lower for kw in keywords):
                 matched_patterns.append(label)
+
+        bert_confidence = 0.0
+        is_fraud_bert = False
+        
+        try:
+            self._load_model()
+            inputs = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=128, padding=True).to(self.device)
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                probs = torch.softmax(outputs.logits, dim=-1)
+                confidence, prediction = torch.max(probs, dim=-1)
+            
+            is_fraud_bert = bool(prediction.item() == 1)
+            bert_confidence = float(confidence.item())
+        except Exception as e:
+            logger.warning(f"BERT SMS Classification failed, falling back to patterns: {e}")
+            # Heuristic fallback if BERT fails
+            if matched_patterns:
+                bert_confidence = 0.85 # Strong confidence if patterns match
+                is_fraud_bert = True
+            else:
+                bert_confidence = 0.1 # Low confidence if nothing matches
+                is_fraud_bert = False
                 
         return {
-            "is_fraud": is_fraud,
-            "confidence": float(confidence.item()),
+            "is_fraud": is_fraud_bert,
+            "confidence": bert_confidence,
             "fraud_patterns": matched_patterns,
             "text_preview": text[:50] + "..." if len(text) > 50 else text
         }

@@ -54,8 +54,32 @@ class CallIntentClassifier:
 
     def classify_transcript(self, transcript: str) -> dict:
         """Classifies transcript text into fraud patterns."""
+        # Keyword-based pattern matching fallback
+        patterns = {
+            "urgency": ["turant", "abhi", "jaldi", "immediate", "urgent", "expire"],
+            "impersonation": ["manager", "officer", "bank", "police", "service", "kyc"],
+            "money_request": ["transfer", "bhejo", "send", "pay", "baaki", "lottery", "prize"],
+            "secrecy_demand": ["secret", "don't tell", "kisi ko mat batana", "otp"],
+            "threat": ["block", "freeze", "jail", "legal", "action"]
+        }
+
+        detected_patterns = []
+        text_lower = transcript.lower()
+        for label, keywords in patterns.items():
+            if any(kw.lower() in text_lower for kw in keywords):
+                detected_patterns.append(label)
+
         if self.tokenizer is None or self.model is None:
-            raise RuntimeError("M4 Intent Classifier models not loaded properly.")
+            logger.warning("M4 Intent Classifier models not loaded, using patterns only.")
+            confidence_val = 0.85 if detected_patterns else 0.1
+            top_label = detected_patterns[0] if detected_patterns else "safe"
+            
+            return {
+                "detected_patterns": detected_patterns or ["safe"],
+                "highest_risk_pattern": top_label,
+                "confidence": confidence_val,
+                "risk_level": "HIGH" if detected_patterns else "LOW"
+            }
 
         inputs = self.tokenizer(
             transcript, 
@@ -73,8 +97,13 @@ class CallIntentClassifier:
             top_label = self.LABEL_MAP.get(predicted_idx.item(), "unknown")
             confidence_val = float(confidence.item())
             
+            # Combine BERT with patterns
+            final_patterns = list(set([top_label] + detected_patterns))
+            if confidence_val < 0.5 and detected_patterns:
+                confidence_val = 0.6 # Boost if patterns match but BERT is unsure
+            
             return {
-                "detected_patterns": [top_label],
+                "detected_patterns": final_patterns,
                 "highest_risk_pattern": top_label,
                 "confidence": confidence_val,
                 "risk_level": "HIGH" if confidence_val > 0.7 else "MEDIUM"
