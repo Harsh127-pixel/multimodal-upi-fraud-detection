@@ -10,8 +10,8 @@ declare module 'vue' {
   }
 }
 
-// Direct backend URL bypassing the devServer proxy for reliability
-const api = axios.create({ baseURL: 'http://127.0.0.1:8000/api' })
+// Standard relative path for devServer proxy compatibility
+const api = axios.create({ baseURL: '/api' })
 
 // Add Request Interceptor for JWT
 api.interceptors.request.use((config) => {
