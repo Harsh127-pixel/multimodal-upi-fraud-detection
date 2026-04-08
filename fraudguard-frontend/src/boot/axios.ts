@@ -10,11 +10,8 @@ declare module 'vue' {
   }
 }
 
-// Dev → proxy via quasar.config.ts; Production → real subdomain
-const isProd = process.env.NODE_ENV === 'production'
-const API_BASE = isProd
-  ? 'https://fraudguard-api.harshbhojwani.in/api'
-  : '/api'
+// Use environment variable for production, fallback to local for development
+const API_BASE = process.env.API_URL || 'http://localhost:8000/api'
 
 const api = axios.create({ baseURL: API_BASE })
 

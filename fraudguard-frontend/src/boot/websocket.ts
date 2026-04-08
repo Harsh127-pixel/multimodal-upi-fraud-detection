@@ -14,10 +14,10 @@ export const connectWebSocket = (userId: string) => {
   // Disconnect existing if any
   disconnect();
 
-  const isProd = process.env.NODE_ENV === 'production'
-  const wsUrl = isProd
-    ? `wss://fraudguard-api.harshbhojwani.in/ws/alerts/${encodeURIComponent(userId)}`
-    : `ws://127.0.0.1:8000/ws/alerts/${encodeURIComponent(userId)}`
+  // Derive WS URL from the API_URL environment variable
+  const apiUrl = process.env.API_URL || 'http://localhost:8000/api'
+  const wsBase = apiUrl.replace('http://', 'ws://').replace('https://', 'wss://').replace('/api', '')
+  const wsUrl = `${wsBase}/ws/alerts/${encodeURIComponent(userId)}`
   
   socket = new WebSocket(wsUrl);
 
