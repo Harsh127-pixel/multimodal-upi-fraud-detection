@@ -44,10 +44,20 @@ class RiskAggregator:
         elif final_score >= 40:
             risk_level = "MEDIUM"
             
+        # Calculate impact percentage for each modality
+        impact_breakdown = {}
+        if weighted_score > 0:
+            impact_breakdown["transaction"] = round((tx_score * self.WEIGHTS["transaction"] / weighted_score) * 100, 1)
+            if sms_confidence is not None:
+                impact_breakdown["sms"] = round(((sms_confidence * 100) * self.WEIGHTS["sms"] / weighted_score) * 100, 1)
+            if voice_confidence is not None:
+                impact_breakdown["voice"] = round(((voice_confidence * 100) * self.WEIGHTS["voice"] / weighted_score) * 100, 1)
+
         return {
             "global_score": round(final_score, 1),
             "risk_level": risk_level,
             "modalities_analyzed": modalities,
+            "impact_breakdown": impact_breakdown,
             "timestamp": datetime.now().isoformat(),
             "recommendation": self._get_recommendation(final_score, modalities)
         }

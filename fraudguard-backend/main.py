@@ -10,6 +10,17 @@ from app.api.audio import router as audio_router
 from app.api.reports import router as reports_router
 from app.api.analytics import router as analytics_router
 from app.api.auth import router as auth_router
+from app.api.advanced import router as advanced_router
+from app.api.mobile import router as mobile_router
+from app.api.graph import router as graph_router
+from app.api.community import router as community_router
+from app.api.legal import router as legal_router
+from app.api.genai import router as genai_router
+from app.api.intelligence import router as intelligence_router
+from app.api.cases import router as cases_router
+from app.api.soc import router as soc_router
+from app.api.playbook import router as playbook_router
+from app.api.scanner import router as scanner_router
 
 app = FastAPI(title="FraudGuard Backend")
 
@@ -41,6 +52,17 @@ app.include_router(audio_router, prefix="/api/audio", tags=["audio"])
 app.include_router(reports_router, prefix="/api/reports", tags=["reports"])
 app.include_router(analytics_router, prefix="/api/analytics", tags=["analytics"])
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+app.include_router(advanced_router, prefix="/api/advanced", tags=["advanced"])
+app.include_router(mobile_router, prefix="/api/mobile", tags=["mobile"])
+app.include_router(graph_router, prefix="/api", tags=["graph"])
+app.include_router(community_router, prefix="/api", tags=["community"])
+app.include_router(legal_router, prefix="/api", tags=["legal"])
+app.include_router(genai_router, prefix="/api", tags=["genai"])
+app.include_router(intelligence_router, prefix="/api", tags=["intelligence"])
+app.include_router(cases_router, prefix="/api", tags=["cases"])
+app.include_router(soc_router, prefix="/api", tags=["soc"])
+app.include_router(playbook_router, prefix="/api", tags=["playbook"])
+app.include_router(scanner_router, prefix="/api", tags=["scanner"])
 
 @app.get("/health")
 async def health_check():

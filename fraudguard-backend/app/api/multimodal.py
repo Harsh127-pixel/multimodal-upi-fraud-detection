@@ -23,19 +23,32 @@ async def multimodal_verify(request: MultimodalVerifyRequest):
     # 1. Score Transaction
     if request.transaction:
         try:
-            # We already have scoring logic in transactions.py
-            # For simplicity, extract it here or use it
             from app.ml.feature_eng import FeatureExtractor
-            from app.core import database
+            from app.api.transactions import _check_ctc_signal
             
-            # Since we can't easily call the async endpoint from here without complex setup
-            # Mock or duplicate logic for now (P13 POC)
-            # M1 expects (1, 18) shape for single prediction
-            features = extractor.extract(request.transaction.model_dump()).reshape(1, -1)
+            # Check CTC signal (5-min window)
+            ctc_flag, ctc_signal = await _check_ctc_signal(request.transaction.payer_upi_id)
+            is_post_call = request.transaction.is_post_call or ctc_flag
+            
+            tx_dict = request.transaction.model_dump()
+            tx_dict["is_post_call"] = is_post_call
+            
+            extractor = FeatureExtractor()
+            features = extractor.extract(tx_dict).reshape(1, -1)
             m1 = registry.get_m1_scorer()
             tx_score = float(m1.predict_proba(features)[0][1] * 100)
+            
+            # Deterministic Blacklist Override
+            known_scammers = ["scammer@upi", "fraudster@upi", "fake_charity@ybl"]
+            if request.transaction.upi_id in known_scammers:
+                tx_score = max(tx_score, 94.5)
+                
+            # Heuristic High-Value Override
+            if request.transaction.amount > 20000 and request.transaction.is_post_call:
+                tx_score = max(tx_score, 88.0)
+                
         except Exception as e:
-            logger.error(f"M1 Score error: {e}")
+            logger.error(f"Multimodal M1 Score error: {e}")
             tx_score = 0.0
 
     # 2. Analyze SMS

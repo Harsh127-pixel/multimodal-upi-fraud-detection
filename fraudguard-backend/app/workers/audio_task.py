@@ -12,10 +12,10 @@ def analyze_audio(file_path: str):
     Analyzes audio for deepfake detection and fraud intent.
     """
     try:
-        # Step 1 — Deepfake detection
+        # Step 1 — M5 (AASIST) Deepfake Detection
         is_synthetic = False
         confidence = 0.65
-        detection_method = "local_heuristic"
+        detection_method = "m5_aasist_local" # Simulated on-device AASIST Q8
         
         resemble_api_key = os.getenv("RESEMBLE_API_KEY")
         if resemble_api_key:
@@ -30,43 +30,49 @@ def analyze_audio(file_path: str):
                     )
                     if response.status_code == 200:
                         data = response.json()
-                        # Extract is_synthetic and confidence based on typical Resemble API response
                         is_synthetic = data.get("is_synthetic", False)
                         confidence = float(data.get("confidence", 0.8))
-                        detection_method = "resemble_ai"
-            except Exception as e:
-                # Fallback to local heuristic on API error
+                        detection_method = "resemble_ai_cloud"
+            except Exception:
                 pass
 
-        if detection_method == "local_heuristic":
+        if detection_method == "m5_aasist_local":
+            # Real AASIST (on-device) would process the raw waveform.
+            # Here we simulate feature extraction used by AASIST.
             y, sr = librosa.load(file_path, sr=None)
-            spectral_flatness = np.mean(librosa.feature.spectral_flatness(y=y))
-            duration = librosa.get_duration(y=y, sr=sr)
+            # Simulated feature: spectral centroid and zero crossing rate variance
+            sc = librosa.feature.spectral_centroid(y=y, sr=sr)
+            zcr = librosa.feature.zero_crossing_rate(y=y)
+            # Synthetic voices often have unnaturally consistent ZCR or Centroid "shimmer"
+            shimmer = np.std(sc) / np.mean(sc)
+            zcr_var = np.var(zcr)
             
-            # Simple heuristic: high flatness (static/synthetic-like) or very short duration
-            is_synthetic = (spectral_flatness > 0.3) or (duration < 2.0)
-            confidence = 0.72 if is_synthetic else 0.65
+            # Simple simulation logic for deepfake detection
+            is_synthetic = (shimmer < 0.1) or (zcr_var < 0.0001)
+            confidence = 0.88 if is_synthetic else 0.74
 
-        # Step 2 — Transcript + intent analysis
-        clf = CallIntentClassifier()
-        intent_result = clf.analyze(file_path)
+        # Step 2 — Transcript + intent analysis (M4)
+        from app.ml.model_registry import registry
+        clf = registry.get_m4_classifier()  # Use registry for singleton
         
-        transcript = intent_result.get("transcript", "")
+        transcript = clf.transcribe(file_path)
+        intent_result = clf.classify_transcript(transcript)
+        
         detected_patterns = intent_result.get("detected_patterns", [])
         highest_risk_pattern = intent_result.get("highest_risk_pattern", "")
         intent_confidence = intent_result.get("confidence", 0.0)
 
         # Step 3 — Compute combined risk score
-        base = 80 if is_synthetic else 20
+        base = 75 if is_synthetic else 10
         pattern_bonus = {
-            "urgency": 15, 
-            "threat": 15, 
-            "money_request": 10, 
-            "impersonation": 10, 
-            "secrecy_demand": 8
+            "urgency": 20, 
+            "threat": 20, 
+            "money_request": 15, 
+            "impersonation": 15, 
+            "secrecy_demand": 10
         }
         
-        combined_score = min(100, base + pattern_bonus.get(highest_risk_pattern, 0))
+        combined_score = min(100, base + sum([pattern_bonus.get(p, 0) for p in detected_patterns]))
         risk_level = "high" if combined_score >= 70 else "medium" if combined_score >= 40 else "low"
 
         # Result dict
@@ -79,7 +85,9 @@ def analyze_audio(file_path: str):
             "highest_risk_pattern": highest_risk_pattern,
             "intent_confidence": float(intent_confidence),
             "combined_risk_score": int(combined_score),
-            "risk_level": risk_level
+            "risk_level": risk_level,
+            "model_m5": "AASIST Q8 INT8 (Simulated)",
+            "model_m4": "DistilRoBERTa Intent"
         }
         return result
 
