@@ -35,11 +35,14 @@ export default defineRouter(function ({ store }) {
   Router.beforeEach((to) => {
     const authStore = useAuthStore(store);
     
-    if (to.path !== '/login' && !authStore.isAuthenticated) {
-      return { path: '/login' };
+    // Explicitly re-check localStorage if store isn't hydated yet (race conditions in boot)
+    const hasToken = !!localStorage.getItem('auth_token');
+    
+    if (to.name !== 'login' && !authStore.isAuthenticated && !hasToken) {
+      return { name: 'login' };
     } 
     
-    if (to.path === '/login' && authStore.isAuthenticated) {
+    if (to.name === 'login' && (authStore.isAuthenticated || hasToken)) {
       return { path: '/' };
     }
     
