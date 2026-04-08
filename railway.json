@@ -6,7 +6,6 @@
   },
   "deploy": {
     "numReplicas": 1,
-    "sleepApplication": false,
-    "runtime": "DOCKER"
+    "sleepApplication": false
   }
 }
