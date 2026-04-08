@@ -60,3 +60,31 @@ async def login(user_in: UserLogin, db: AsyncSession = Depends(get_db)):
             "id": str(user.id)
         }
     }
+
+from app.api.deps import get_current_user
+from sqlalchemy import func
+from app.models.transaction import Transaction
+from datetime import datetime
+
+@router.get("/me")
+async def get_user_profile(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Calculate account age in days
+    age_days = (datetime.utcnow() - current_user.created_at).days
+
+    # Calculate tx count and avg amount
+    stmt = select(func.count(Transaction.id), func.avg(Transaction.amount)).where(Transaction.upi_id == current_user.email)
+    result = await db.execute(stmt)
+    row = result.one_or_none()
+    
+    tx_count = row[0] if row and row[0] is not None else 0
+    avg_amount = row[1] if row and row[1] is not None else 0.0
+
+    return {
+        "email": current_user.email,
+        "account_age_days": max(1, age_days),
+        "tx_count": tx_count,
+        "avg_amount": float(avg_amount)
+    }

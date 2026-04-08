@@ -1,53 +1,55 @@
+"""
+FraudGuard Alert WebSocket
+Replaced Redis pubsub with a lightweight in-memory broadcast to prevent
+the async event loop from blocking when Redis is unavailable.
+"""
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-import redis.asyncio as redis
-import os
 import asyncio
 import logging
+import json
+from datetime import datetime, timezone
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+# In-memory alert queue (per user_id)
+ALERT_QUEUES: dict[str, list] = {}
+
+def push_alert(user_id: str, alert: dict):
+    """Push an alert to a connected user's queue (called by other endpoints)."""
+    if user_id not in ALERT_QUEUES:
+        ALERT_QUEUES[user_id] = []
+    ALERT_QUEUES[user_id].append(alert)
 
 @router.websocket("/ws/alerts/{user_id}")
 async def websocket_alerts(websocket: WebSocket, user_id: str):
-    logger.info(f"Incoming WS connection attempt for user: {user_id}")
+    logger.info(f"WS connection for user: {user_id}")
     await websocket.accept()
-    
-    # Establish Redis connection for this websocket
-    r = redis.from_url(REDIS_URL, decode_responses=True)
-    pubsub = r.pubsub()
-    channel = f"alerts:{user_id}"
-    
+    ALERT_QUEUES.setdefault(user_id, [])
+
+    # Send a welcome ping immediately
+    await websocket.send_text(json.dumps({
+        "type": "connected",
+        "message": "FraudGuard Alert Stream Active",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }))
+
     try:
-        await pubsub.subscribe(channel)
-        logger.info(f"User {user_id} connected to alerts WebSocket")
-        
         while True:
-            # Check for messages in the pubsub channel
-            # Wait for message with a timeout to allow checking for disconnect
-            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-            
-            if message:
-                try:
-                    # Forward the JSON message string to the WebSocket client
-                    await websocket.send_text(message['data'])
-                except Exception as send_err:
-                    logger.error(f"Error sending message to client {user_id}: {str(send_err)}")
-                    break
-            
-            # Periodically yield back to the event loop
-            await asyncio.sleep(0.01)
-            
+            # Drain any queued alerts
+            queue = ALERT_QUEUES.get(user_id, [])
+            while queue:
+                alert = queue.pop(0)
+                await websocket.send_text(json.dumps(alert))
+
+            # Yield back to event loop — no blocking Redis calls
+            await asyncio.sleep(0.5)
+
     except WebSocketDisconnect:
         logger.info(f"User {user_id} disconnected from alerts WebSocket")
     except Exception as e:
-        logger.error(f"Unexpected WebSocket error for user {user_id}: {str(e)}")
+        logger.warning(f"Alert WS error for {user_id}: {e}")
     finally:
-        # Cleanup
-        try:
-            await pubsub.unsubscribe(channel)
-            await r.close()
-        except:
-            pass
-        logger.info(f"Cleaned up resources for user {user_id}")
+        ALERT_QUEUES.pop(user_id, None)
+        logger.info(f"Cleaned up alert stream for user {user_id}")

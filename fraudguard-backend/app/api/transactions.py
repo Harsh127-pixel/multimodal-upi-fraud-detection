@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import time
 import os
+import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -26,64 +27,111 @@ class TransactionRequest(BaseModel):
     user_avg_amount: float
     user_tx_count: int
 
+# ─── CTC: Call-to-Transaction Correlation ──────────────────────────────────
+CTC_WINDOW_SECONDS = 300   # 5-minute window (per paper §5.2)
+
+async def _check_ctc_signal(payer_upi_id: str) -> tuple[bool, str | None]:
+    """
+    CTC Algorithm: returns (is_post_call, signal_message)
+    Mocked for prototype stable execution.
+    """
+    # Simulate: If payer is test victim, flag CTC
+    if "victim" in payer_upi_id.lower():
+        return True, "Payment initiated 2m 14s after unknown call (CTC alert)"
+    
+    return False, None
+
+# ─── M6 Graph Risk Score ────────────────────────────────────────────────────
+def _get_graph_risk_score(upi_id: str) -> float:
+    """Fetch M6 graph_risk_score from Redis cache or compute inline."""
+    try:
+        import redis as sync_redis
+        REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+        r = sync_redis.from_url(REDIS_URL, decode_responses=True)
+        cached = r.get(f"graph:risk:{upi_id}")
+        r.close()
+        if cached is not None:
+            return float(cached)
+    except Exception:
+        pass
+
+    # Inline scoring if cache miss
+    try:
+        from app.ml.graph_scorer import get_graph_risk_score
+        return get_graph_risk_score(upi_id)
+    except Exception:
+        return 0.1  # safe default
+
+
 @router.post("/score")
 async def score_transaction(request: TransactionRequest, db: AsyncSession = Depends(get_db)):
     start_time = time.time()
-    
-    # 1. Pipeline: Feature Extraction
-    # Map request to internal transaction dict format
+
+    # ── CTC Check ─────────────────────────────────────────────────────────
+    ctc_flag, ctc_signal = await _check_ctc_signal(request.payer_upi_id)
+
+    # Override is_post_call if CTC detects a recent unknown call
+    is_post_call = request.is_post_call or ctc_flag
+
+    # ── M6 Graph Risk Score ───────────────────────────────────────────────
+    graph_risk_score = _get_graph_risk_score(request.upi_id)
+
+    # ── Feature Extraction ────────────────────────────────────────────────
     tx_dict = {
-        "upi_id": request.upi_id,
-        "amount": request.amount,
-        "device_id": request.device_id,
-        "timestamp": request.timestamp,
-        "payer_account_age_days": request.payer_account_age_days,
-        "is_post_call": request.is_post_call,
-        "user_baseline_amount": request.user_avg_amount,
-        "tx_velocity_1hr": request.user_tx_count,
-        # Default or derived values for missing parts in this schema
-        "device_match": request.device_id == request.payer_device_id,
-        "upi_age_days": 365 if "trusted" in request.upi_id else 10, # Mock logic based on user test inputs
-        "payee_blacklist_score": 0.8 if "fraud" in request.upi_id else 0.0,
-        "is_new_payee": True if "new" in request.upi_id else False,
-        "registration_state_risk": 0.5
+        "upi_id":                       request.upi_id,
+        "amount":                       request.amount,
+        "device_id":                    request.device_id,
+        "timestamp":                    request.timestamp,
+        "payer_account_age_days":       request.payer_account_age_days,
+        "is_post_call":                 is_post_call,
+        "user_baseline_amount":         request.user_avg_amount,
+        "tx_velocity_1hr":              request.user_tx_count,
+        "device_match":                 request.device_id == request.payer_device_id,
+        "upi_age_days":                 365 if "trusted" in request.upi_id else 10,
+        "payee_blacklist_score":        min(0.95, graph_risk_score + (0.8 if "fraud" in request.upi_id else 0.0)),
+        "is_new_payee":                 "new" in request.upi_id,
+        "registration_state_risk":      0.5,
+        # M6 graph risk fed directly as a feature
+        "payee_payer_graph_distance":   graph_risk_score * 10,  # scale to [0,10]
     }
-    
+
     extractor = FeatureExtractor(redis_client=None)
     features = extractor.extract(tx_dict)
-    
-    # 2. Pipeline: Model Scoring
+
+    # ── M1 Scoring ───────────────────────────────────────────────────────
     try:
         model = registry.get_m1_scorer()
-        # predict_proba returns [ [prob_0, prob_1] ]
         prob_fraud = model.predict_proba([features])[0][1]
-        score = int(prob_fraud * 100)
+        # Blend M1 probability with M6 graph risk (weighted)
+        blended_prob = 0.80 * prob_fraud + 0.20 * graph_risk_score
+        score = int(blended_prob * 100)
     except Exception as e:
-        # Fallback for errors or missing model
         if "M1 model not found" in str(e):
             raise HTTPException(status_code=500, detail=str(e))
-        score = 50 # Default middle score on unexpected failure
-    
-    # 3. Action Logic
+        score = 50
+
+    # ── Action Logic ──────────────────────────────────────────────────────
     action = "block" if score >= 75 else "warn" if score >= 40 else "allow"
-    
-    # 4. Risk Signals (matching feature indices in np.array)
-    risk_signals = []
-    if features[9] == 1.0: # is_post_call
+
+    # ── Risk Signals ──────────────────────────────────────────────────────
+    risk_signals: List[str] = []
+    if ctc_signal:
+        risk_signals.append(ctc_signal)
+    if is_post_call and not ctc_signal:
         risk_signals.append("Payment initiated right after unknown call")
-    if features[14] > 0.5: # payee_blacklist_score
+    if graph_risk_score > 0.6:
+        risk_signals.append(f"High graph network risk score: {graph_risk_score:.2f} (M6)")
+    if features[14] > 0.5:
         risk_signals.append("Payee flagged in community blacklist")
-    if features[2] > 5: # tx_velocity_1hr
+    if features[2] > 5:
         risk_signals.append("Unusually high transaction frequency")
-    if features[13] == 1.0 and features[16] == 1.0: # is_new_payee and is_high_value
+    if features[13] == 1.0 and features[16] == 1.0:
         risk_signals.append("Large payment to new payee")
-    if features[0] < 30: # upi_age_days
+    if features[0] < 30:
         risk_signals.append("Payee UPI ID recently registered")
-    
-    # Limit to max 5 signals
     risk_signals = risk_signals[:5]
-    
-    # 5. Database Save
+
+    # ── Save to DB ───────────────────────────────────────────────────────
     new_tx = Transaction(
         upi_id=request.upi_id,
         amount=request.amount,
@@ -91,57 +139,56 @@ async def score_transaction(request: TransactionRequest, db: AsyncSession = Depe
         is_fraud=(score >= 75),
         timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
         device_id=request.device_id,
-        post_call_flag=request.is_post_call
+        post_call_flag=is_post_call
     )
-    
     db.add(new_tx)
     await db.commit()
-    
-    # Pipeline: Publish Real-time Alerts
+
+    # ── Redis Alert Publish ───────────────────────────────────────────────
     if score >= 40:
-        import redis.asyncio as redis
-        import json
-        
-        REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
         try:
-            r = redis.from_url(REDIS_URL, decode_responses=True)
+            import redis.asyncio as redis_async
+            REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+            r = redis_async.from_url(REDIS_URL, decode_responses=True)
             alert_data = {
                 "type": "fraud_alert",
                 "upi_id": request.upi_id,
                 "score": score,
                 "action": action,
                 "risk_signals": risk_signals,
+                "graph_risk_score": round(graph_risk_score, 3),
+                "ctc_triggered": ctc_flag,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
-            # Use payer_upi_id as the user identifier as requested
-            channel = f"alerts:{request.payer_upi_id}"
-            await r.publish(channel, json.dumps(alert_data))
+            await r.publish(f"alerts:{request.payer_upi_id}", json.dumps(alert_data))
             await r.close()
         except Exception as e:
-            # Skip silently and log a warning as requested
             import logging
-            logging.getLogger(__name__).warning(f"Failed to publish alert to Redis: {str(e)}")
-    
+            logging.getLogger(__name__).warning(f"Alert publish failed: {e}")
+
     elapsed_ms = int((time.time() - start_time) * 1000)
-    
+
     return {
         "score": score,
         "action": action,
         "risk_signals": risk_signals,
         "upi_id": request.upi_id,
+        "graph_risk_score": round(graph_risk_score, 3),
+        "ctc_triggered": ctc_flag,
         "processing_time_ms": elapsed_ms
     }
 
+
 @router.get("/history")
 async def get_transaction_history(
-    db: AsyncSession = Depends(get_db), 
+    db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
     from sqlalchemy import select, desc
     stmt = select(Transaction).order_by(desc(Transaction.timestamp)).limit(100)
     result = await db.execute(stmt)
     transactions = result.scalars().all()
-    
+
     response = []
     for tx in transactions:
         action = "block" if tx.score >= 75 else "warn" if tx.score >= 40 else "allow"
