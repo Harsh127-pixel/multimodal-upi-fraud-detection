@@ -164,9 +164,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
 import { api } from 'boot/axios'
+import { useAuthStore } from 'src/stores/authStore'
 
 interface AnalysisResult {
   global_score: number;
@@ -176,9 +177,13 @@ interface AnalysisResult {
 }
 
 const $q = useQuasar()
+const authStore = useAuthStore()
 const tab = ref('transaction')
 const loading = ref(false)
 const result = ref<AnalysisResult | null>(null)
+
+// Generate a stable device fingerprint for this browser session
+const deviceId = `DEV-${navigator.userAgent.length}-${screen.width}x${screen.height}`
 
 // Audio Recording State
 const audioFile = ref<File | null>(null)
@@ -190,16 +195,29 @@ let audioChunks: Blob[] = []
 const form = reactive({
   upi_id: '',
   amount: 0,
-  device_id: 'DEV-999',
+  device_id: deviceId,
   timestamp: new Date().toISOString(),
-  payer_upi_id: 'me@upi',
-  payer_device_id: 'DEV-999',
-  payer_account_age_days: 365,
+  payer_upi_id: authStore.userEmail ?? 'unknown@upi',
+  payer_device_id: deviceId,
+  payer_account_age_days: 0,
   is_post_call: false,
-  user_avg_amount: 500,
-  user_tx_count: 50,
+  user_avg_amount: 0,
+  user_tx_count: 0,
   sms_text: '',
   call_transcript: ''
+})
+
+onMounted(async () => {
+  try {
+    const res = await api.get('/auth/me');
+    if (res.data) {
+      form.payer_account_age_days = res.data.account_age_days || 1;
+      form.user_avg_amount = res.data.avg_amount || 0;
+      form.user_tx_count = res.data.tx_count || 0;
+    }
+  } catch (err) {
+    console.error('Failed to load personalized user stats:', err);
+  }
 })
 
 const scoreColorClass = computed(() => {
