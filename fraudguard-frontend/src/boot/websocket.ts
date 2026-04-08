@@ -14,8 +14,10 @@ export const connectWebSocket = (userId: string) => {
   // Disconnect existing if any
   disconnect();
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//127.0.0.1:8000/ws/alerts/${encodeURIComponent(userId)}`;
+  const isProd = process.env.NODE_ENV === 'production'
+  const wsUrl = isProd
+    ? `wss://fraudguard-api.harshbhojwani.in/ws/alerts/${encodeURIComponent(userId)}`
+    : `ws://127.0.0.1:8000/ws/alerts/${encodeURIComponent(userId)}`
   
   socket = new WebSocket(wsUrl);
 

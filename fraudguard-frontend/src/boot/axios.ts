@@ -10,8 +10,13 @@ declare module 'vue' {
   }
 }
 
-// Standard relative path for devServer proxy compatibility
-const api = axios.create({ baseURL: '/api' })
+// Dev → proxy via quasar.config.ts; Production → real subdomain
+const isProd = process.env.NODE_ENV === 'production'
+const API_BASE = isProd
+  ? 'https://fraudguard-api.harshbhojwani.in/api'
+  : '/api'
+
+const api = axios.create({ baseURL: API_BASE })
 
 // Add Request Interceptor for JWT
 api.interceptors.request.use((config) => {
