@@ -11,7 +11,12 @@ declare module 'vue' {
 }
 
 // Use environment variable for production, fallback to local for development
-const API_BASE = process.env.API_URL || 'http://localhost:8000/api'
+let API_BASE = process.env.API_URL || 'http://localhost:8000/api'
+
+// Force protocol if missing
+if (API_BASE && !API_BASE.startsWith('http')) {
+  API_BASE = `https://${API_BASE}`
+}
 
 const api = axios.create({ baseURL: API_BASE })
 
