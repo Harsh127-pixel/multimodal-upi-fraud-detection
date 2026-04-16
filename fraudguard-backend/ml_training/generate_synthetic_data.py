@@ -64,19 +64,37 @@ def generate_transactions(count):
         payer_account_age_days = upi_age_days + random.randint(0, 1000)
         is_high_value = 1 if amount > 10000 else 0
         
-        # Add noise
-        noise_factor = 1.0 + random.uniform(-0.05, 0.05)
+        # Aggressive noise - force overlap
+        noise_factor = 1.0 + random.uniform(-0.3, 0.3)
         upi_age_days *= noise_factor
         amount *= noise_factor
-        amount_deviation *= noise_factor
-        registration_state_risk *= noise_factor
-        tx_velocity_1hr *= noise_factor
+        amount_deviation *= (1.0 + random.uniform(-0.5, 0.5))
+        registration_state_risk *= (1.0 + random.uniform(-0.4, 0.4))
+        tx_velocity_1hr *= (1.0 + random.uniform(-0.5, 0.5))
         
+        # Corrupt features for fraud (make them look legitimate)
+        if is_fraud and random.random() < 0.15:
+            is_post_call = 0
+            upi_age_days = random.randint(100, 2000)
+            tx_velocity_1hr = random.randint(0, 2)
+            payee_blacklist_score = random.uniform(0.0, 0.2)
+            
+        # Corrupt features for legitimate (make them look like fraud)
+        if not is_fraud and random.random() < 0.12:
+            is_post_call = 1
+            upi_age_days = random.randint(1, 20)
+            tx_velocity_1hr = random.randint(5, 12)
+            payee_blacklist_score = random.uniform(0.4, 0.9)
+            
         data.append([
-            upi_age_days, registration_state_risk, tx_velocity_1hr, tx_velocity_24hr, tx_velocity_7d,
-            amount, amount_deviation, time_of_day_risk, is_weekend, is_post_call,
-            payee_payer_graph_distance, payer_account_age_days, device_match, is_new_payee,
-            payee_blacklist_score, amount_round_number, is_high_value, float(hour_of_day), is_fraud
+            float(upi_age_days), float(registration_state_risk), float(tx_velocity_1hr), 
+            float(tx_velocity_24hr), float(tx_velocity_7d),
+            float(amount), float(amount_deviation), float(time_of_day_risk), 
+            float(is_weekend), float(is_post_call),
+            float(payee_payer_graph_distance), float(payer_account_age_days), 
+            float(device_match), float(is_new_payee),
+            float(payee_blacklist_score), float(amount_round_number), 
+            float(is_high_value), float(hour_of_day), is_fraud
         ])
         
     df = pd.DataFrame(data, columns=columns)

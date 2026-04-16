@@ -22,7 +22,7 @@ if not os.path.exists(DATA_PATH):
     raise FileNotFoundError(f"Data not found! Run generate_synthetic_data.py --type call_transcripts first.")
 
 df = pd.read_csv(DATA_PATH)
-df = df.sample(n=min(5000, len(df)), random_state=42)
+df = df.sample(n=min(200, len(df)), random_state=42)
 print(f"Loaded {len(df)} samples (optimized for 15-25 min training).")
 
 # 2. Map fraud_pattern to integers

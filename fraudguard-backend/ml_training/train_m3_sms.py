@@ -22,7 +22,7 @@ if not os.path.exists(DATA_PATH):
     raise FileNotFoundError(f"Data file not found at {DATA_PATH}")
 
 df = pd.read_csv(DATA_PATH)
-df = df.sample(n=min(2000, len(df)), random_state=42)
+df = df.sample(n=min(300, len(df)), random_state=42)
 print(f"Loaded {len(df)} samples (subsampled for speed).")
 
 # 2. Split data
