@@ -5,3 +5,11 @@ __pycache__/
 .env
 .git/
 .vscode/
+models/
+uploads/
+ml_training/data/
+*.wav
+*.mp3
+*.pkl
+*.pt
+*.csv
