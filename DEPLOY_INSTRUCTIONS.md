@@ -4,27 +4,22 @@ Follow these steps to get your full-stack application live.
 
 ---
 
-## 🏗️ PART 1: Deploy Backend (Railway)
-*Railway will host your FastAPI code, PostgreSQL database, and Redis cache.*
+## 🏗️ PART 1: Deploy Backend (Render)
+*Render will host your FastAPI code, PostgreSQL database, and Redis cache.*
 
-1.  **Login to [Railway.app](https://railway.app)** using your GitHub account.
-2.  **Create New Project**:
-    *   Click `+ New Project`.
-    *   Select `Deploy from GitHub repo`.
-    *   Choose your `multimodal-upi-fraud-detection` repository.
+1.  **Login to [Render.com](https://render.com)** using your GitHub account.
+2.  **Create New Blueprint Instance**:
+    *   Click `New` → `Blueprint`.
+    *   Connect your `multimodal-upi-fraud-detection` repository.
+    *   Render will detect the `render.yaml` file.
 3.  **Configure Service**:
-    *   Railway will ask for the root folder. Select **`fraudguard-backend`**.
-    *   Go to the **Variables** tab and click `+ New Variable`.
-    *   Add `PORT` = `8000`.
-4.  **Add Databases**:
-    *   In the project canvas, click `+` → **Database** → **PostgreSQL**.
-    *   Click `+` → **Database** → **Redis**.
-5.  **Link Everything**:
-    *   Railway automatically injects `DATABASE_URL` and `REDIS_URL` into your backend service if they are in the same project. Double-check the **Variables** tab of your `backend` service to ensure they are there.
-6.  **Get your API URL**:
-    *   Go to **Settings** → **Public Networking**.
-    *   Click **Generate Domain**.
-    *   Copy the URL (e.g., `https://fraudguard-production.up.railway.app`). **This is your `API_URL`.**
+    *   Give it a name (e.g., `fraudguard`).
+    *   Click **Approve**.
+    *   *Note: Render Redis requires a paid plan (starts at $7/mo). If you want a free Redis, you can use [Upstash](https://upstash.com) and manually set the `REDIS_URL` in Render's dashboard.*
+4.  **Database Migration**:
+    *   Render will automatically run `alembic upgrade head` as part of the Docker build (see `Dockerfile`).
+5.  **Get your API URL**:
+    *   Once the `backend` service is live, copy its URL (e.g., `https://fraudguard-backend.onrender.com`). **This is your `API_URL`.**
 
 ---
 
@@ -44,7 +39,7 @@ Follow these steps to get your full-stack application live.
 4.  **Environment Variables**:
     *   Add a new variable:
         *   **Name:** `API_URL`
-        *   **Value:** `https://your-railway-url.up.railway.app/api` (Make sure to add **`/api`** at the end).
+        *   **Value:** `https://your-render-url.onrender.com/api` (Make sure to add **`/api`** at the end).
 5.  **Deploy**:
     *   Click **Deploy**. In ~2 minutes, your frontend will be live at a `.vercel.app` URL!
 
@@ -53,9 +48,9 @@ Follow these steps to get your full-stack application live.
 ## ✅ Post-Deployment Checklist
 
 1.  **Frontend Check**: Open your Vercel URL. You should see the login page.
-2.  **API Check**: Open `https://your-railway-url.up.railway.app/docs`. You should see the FastAPI Swagger UI.
+2.  **API Check**: Open `https://your-render-url.onrender.com/docs`. You should see the FastAPI Swagger UI.
 3.  **Database Migration**:
-    *   If the app crashes on the first login, Railway might need you to run migrations. In the Railway dashboard, go to your backend service → **Deployments** → **Details** → **CMD**. You can trigger a one-time command: `alembic upgrade head`.
+    *   If the app crashes on the first login, Render might need you to run migrations manually if the automatic one failed. In the Render dashboard, go to your backend service → **Shell** and run: `alembic upgrade head`.
 
 ---
 

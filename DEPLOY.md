@@ -1,9 +1,9 @@
 # Deployment Guide
 
-## Railway Deployment
-1. Link your GitHub repository to Railway.
-2. Under "Variables", set up the environment variables from your `.env.example` files.
-3. The `.github/workflows/deploy.yml` will automatically deploy your main branch to Railway whenever you push.
+## Render Deployment
+1. Link your GitHub repository to Render.
+2. Select "Blueprint" to use the `render.yaml` configuration.
+3. Render will automatically deploy your main branch whenever you push.
 
 ## Android APK Signing
 1. Generate an upload keystore file.

@@ -1,0 +1,32 @@
+services:
+  # FastAPI Backend
+  - type: web
+    name: fraudguard-backend
+    env: docker
+    dockerContext: .
+    dockerfilePath: fraudguard-backend/Dockerfile
+    plan: free
+    region: ohio # Change as needed
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fraudguard-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: fraudguard-redis
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+
+  # Redis (Note: Render Redis is not available on the free tier in all regions)
+  - type: redis
+    name: fraudguard-redis
+    plan: starter # Render Redis starts at $7/mo
+    ipAllowList: [] # Only allow internal connections
+
+databases:
+  - name: fraudguard-db
+    plan: free
+    region: ohio
